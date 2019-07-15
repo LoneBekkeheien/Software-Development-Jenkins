@@ -1,0 +1,38 @@
+@startuml class-diagram.png
+skinparam handwritten true
+skinparam monochrome true
+skinparam packageStyle rect
+skinparam defaultFontName FG Virgil
+skinparam shadowing false
+
+actor User
+
+participant ContactsDialog
+participant EditContactsPresenter
+participant ContactUpdatedEvent
+participant ContactUpdatedEventHandler
+participant ContactsController
+participant ContactsPresenter
+participant ContactsServiceAsync
+
+
+
+User ->> ContactsDialog : *presses save*
+ContactsDialog ->> EditContactsPresenter : *triggers handler* onClick()
+EditContactsPresenter ->> EditContactsPresenter : doSave()
+ContactsDialog <<-- EditContactsPresenter : hide()
+EditContactsPresenter ->> ContactsServiceAsync : updateContact()
+EditContactsPresenter ->> ContactUpdatedEvent : new event
+ContactUpdatedEvent ->> ContactUpdatedEventHandler : dispatch()
+ContactUpdatedEventHandler ->> ContactsController : onContactUpdated()
+ContactsController ->> ContactsController : doContactUpdated()
+ContactsController ->> ContactsPresenter : new presenter
+ContactsPresenter ->> ContactsPresenter : getList()
+ContactsPresenter ->> ContactsServiceAsync : getContactDetails()
+ContactsPresenter ->> ContactsPresenter : setData()
+
+
+
+
+
+@enduml

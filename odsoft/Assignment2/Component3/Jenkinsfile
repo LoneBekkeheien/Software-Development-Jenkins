@@ -1,0 +1,251 @@
+#!/usr/bin/env groovy
+
+node{
+if(isUnix()){
+
+
+
+     stage('Checkout'){
+		    checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: '94be0be5-068f-4bd8-b8f0-86b2fcd3f9cf', url: 'https://LoneBekkeheien@bitbucket.org/KonstantinShuxtelinsky/teamerasmus.git']]])
+	     }
+
+    dir('odsoft/Assignment2/Component3/Week1'){
+
+        stage('Build Project'){
+    	        sh 'gradle build & gradle war & gradle javadoc'
+                archiveArtifacts '**\\*.war'
+
+
+
+                }
+
+
+        stage('Archive Files'){
+				publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: '\\build\\docs\\javadoc', reportFiles: 'index.html', reportName: 'Javadoc', reportTitles: ''])
+
+        }
+
+
+
+
+
+try{
+
+	    stage('Unit Tests'){
+	         sh 'gradle cleanTest test'
+
+			  publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: '\\build\\reports\\test', reportFiles: 'index.html', reportName: 'HTML Report - Unit Test', reportTitles: ''])
+
+			  junit allowEmptyResults: true, testResults: 'build/test-results/test/*.xml'
+
+	    }
+
+
+
+
+		stage('Coverage report'){
+
+
+
+			  jacoco()
+
+		}
+
+	    stage('Integration Tests'){
+	        sh 'gradle cleanIntegrationTest integrationTest'
+
+			 publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: '\\build\\reports\\integrationTest', reportFiles: 'index.html', reportName: 'HTML Report - Integration Test', reportTitles: ''])
+
+	    }
+
+
+
+
+    stage('Mutation Test') {
+        sh 'gradle pitest'
+
+   publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: '\\build\\reports\\pitest', reportFiles: 'index.html', reportName: 'HTML Report - Mutation Coverage', reportTitles: ''])
+
+
+    }
+    stage('Copy war file to tomcat'){
+
+            sh 'curl --user LoneBekk:hohoho http://localhost:8001/'
+            sh ("copy /y build\\libs\\*.war C:\\Users\\Public\\apache-tomcat-7.0.91\\webapps" )
+
+
+        }
+
+
+
+
+
+      stage('Send Mail'){
+    emailext (
+    to: 'lone.bekkeheien@gmail.com',
+    body: 'all the previous tests were successfull executed, please go to Jenkins to perform a manual test',
+    subject: 'Manual Test')
+    }
+    currentBuild.result="SUCCESS"
+
+    stage('Manual Test'){
+        input message: 'Please perform a manual test and confirm by clicking the button below', ok: 'Confirm'
+
+      }
+
+
+    }
+
+
+    catch(error){
+        currentBuild.result="FAILURE"
+        emailext (
+        to: 'lone.bekkeheien@gmail.com',
+        body: 'all the previous tests failed',
+        subject: 'Tests failed')
+
+      }
+      finally{
+      stage('Tag on Bitbucket'){
+                  sh("git tag -a LoneBuild#${env.BUILD_NUMBER}-${currentBuild.result} -m 'Jenkins'")
+                  sh 'git config credential.helper "/bin/bash ' + env.WORKSPACE + '/credential-helper.sh"'
+
+                  // credentialsId here is the credentials you have set up in Jenkins for pushing
+                // to that repository using username and password.
+                withCredentials([[
+                        $class: 'UsernamePasswordMultiBinding',
+                  credentialsId: '94be0be5-068f-4bd8-b8f0-86b2fcd3f9cf',
+                  usernameVariable: 'GIT_USERNAME',
+                  passwordVariable: 'GIT_PASSWORD'
+                    ]]) {
+
+                    sh('git push origin --tags')
+                }
+
+            }
+
+  }
+}
+
+}else{
+
+
+
+     stage('Checkout'){
+		    checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: '94be0be5-068f-4bd8-b8f0-86b2fcd3f9cf', url: 'https://LoneBekkeheien@bitbucket.org/KonstantinShuxtelinsky/teamerasmus.git']]])
+	     }
+
+    dir('odsoft/Assignment2/Component3/Week1'){
+
+        stage('Build Project'){
+    	        bat 'gradle build & gradle war & gradle javadoc'
+                archiveArtifacts '**\\*.war'
+
+
+
+                }
+
+
+        stage('Archive Files'){
+
+        publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: '\\build\\docs\\javadoc', reportFiles: 'index.html', reportName: 'HTML Report - Javadoc', reportTitles: ''])
+        }
+
+
+
+
+
+try{
+
+	    stage('Unit Tests'){
+	         bat 'gradle cleanTest test'
+
+			  publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: '\\build\\reports\\test', reportFiles: 'index.html', reportName: 'HTML Report - Unit Test', reportTitles: ''])
+
+			  junit allowEmptyResults: true, testResults: 'build/test-results/test/*.xml'
+
+	    }
+
+
+
+
+		stage('Coverage report'){
+
+			  jacoco()
+		}
+
+	    stage('Integration Tests'){
+	        bat 'gradle cleanIntegrationTest integrationTest'
+
+			 publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: '\\build\\reports\\integrationTest', reportFiles: 'index.html', reportName: 'HTML Report - Integration Test', reportTitles: ''])
+
+	    }
+
+
+
+
+    stage('Mutation Test') {
+        bat 'gradle pitest'
+
+        publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: '\\build\\reports\\pitest', reportFiles: 'index.html', reportName: 'HTML Report - Mutation Coverage', reportTitles: ''])
+    }
+    stage('Copy war file to tomcat'){
+
+            bat 'curl --user LoneBekk:hohoho http://localhost:8001/'
+            bat ("copy /y build\\libs\\*.war C:\\Users\\Public\\apache-tomcat-7.0.91\\webapps" )
+
+
+        }
+
+
+
+
+
+      stage('Send Mail'){
+    emailext (
+    to: 'lone.bekkeheien@gmail.com',
+    body: 'all the previous tests were successfull executed, please go to Jenkins to perform a manual test',
+    subject: 'Manual Test')
+    }
+    currentBuild.result="SUCCESS"
+
+    stage('Manual Test'){
+        input message: 'Please perform a manual test and confirm by clicking the button below', ok: 'Confirm'
+
+      }
+
+
+    }
+
+
+    catch(error){
+        currentBuild.result="FAILURE"
+        emailext (
+        to: 'lone.bekkeheien@gmail.com',
+        body: 'all the previous tests failed',
+        subject: 'Tests failed')
+
+      }
+
+      finally{
+      stage('Tag on Bitbucket'){
+                  bat("git tag -a LoneBuild#${env.BUILD_NUMBER}-${currentBuild.result} -m 'Jenkins'")
+                  bat 'git config credential.helper "/bin/bash ' + env.WORKSPACE + '/credential-helper.sh"'
+
+                  // credentialsId here is the credentials you have set up in Jenkins for pushing
+                // to that repository using username and password.
+                withCredentials([[
+                        $class: 'UsernamePasswordMultiBinding',
+                  credentialsId: '94be0be5-068f-4bd8-b8f0-86b2fcd3f9cf',
+                  usernameVariable: 'GIT_USERNAME',
+                  passwordVariable: 'GIT_PASSWORD'
+                    ]]) {
+
+                    bat('git push origin --tags')
+         }
+
+       }
+     }
+   }
+  }
+}

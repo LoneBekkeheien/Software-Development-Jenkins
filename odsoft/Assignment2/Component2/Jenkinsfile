@@ -1,0 +1,104 @@
+#!/usr/bin/env groovy
+//THIS IS NOT USED FOR MY COMPONENT!!
+node{
+
+      stage('Checkout')
+      {
+	      checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: '3b6adc3a-09d5-4d09-b122-005475566af0', url: 'https://bitbucket.org/KonstantinShuxtelinsky/teamerasmus/src/master/']]])
+      }
+
+      dir('odsoft/Assignment2/Component2/goal2'){
+          try{
+              stage('Build project')
+              {
+                  sh 'gradle build'
+              }
+
+              stage('generate and publish javadoc')
+              {
+                  sh 'gradle javadoc'
+                  publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: '\\build\\docs\\javadoc', reportFiles: 'index.html', reportName: 'Javadoc123', reportTitles: ''])
+              }
+
+              stage('Archive artifacts')
+              {
+                  sh 'gradle war'
+                  archiveArtifacts '**\\*.war'
+              }
+
+              stage('Unit Tests')
+              {
+                  sh 'gradle cleanTest test'
+          		    publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: '\\build\\reports\\test', reportFiles: 'index.html', reportName: 'HTML Report - Unit Test', reportTitles: ''])
+          		    junit allowEmptyResults: true, testResults: 'build/test-results/test/*.xml'
+              }
+
+              stage('Integration Tests')
+              {
+                  sh 'gradle cleanIntegrationTest integrationTest'
+                  publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: '\\build\\reports\\integrationTest', reportFiles: 'index.html', reportName: 'HTML Report - Integration Test', reportTitles: ''])
+          	  }
+
+              /*stage('Coverage report')
+              {
+         			    jacoco()
+       		    }*/
+
+              stage('Mutation Tests')
+              {
+                  sh 'gradle pitest'
+                  publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: '\\build\\reports\\pitest', reportFiles: 'index.html', reportName: 'HTML Report - Pit Test Coverage Report', reportTitles: ''])
+              }
+
+          	  stage('Copy war file to tomcat')
+              {
+                  sh ("cp build/libs/*.war /Users/aleksanderasp/apache-tomcat-7.0.91/webapps" )
+                  sh ('curl --user aleksanderasp:12qwas http://localhost:8090')
+              }
+
+              stage('Email notification')
+              {
+                emailext (
+                  to: 'alek-plopp@hotmail.com',
+                  subject: "SUCCESS: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                  body: """<p>SUCCESS: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]':</p>
+                  <p>Check console output at "<a href="${env.BUILD_URL}">${env.JOB_NAME} [${env.BUILD_NUMBER}]</a>"</p>""",
+                )
+              }
+              currentBuild.result = "SUCCESS"
+
+              stage('Manual confirmation')
+              {
+                input message: "Please perform a manual test and confirm by clicking the button below '${env.WORKSPACE}'", ok: 'Confirm'
+              }
+          }
+
+          catch(Exception e){
+              currentBuild.result = "FAILURE"
+              emailext (
+                to: 'alek-plopp@hotmail.com',
+                subject: "Failure: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                body: """<p>Failure: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]':</p>
+                <p>Check console output at "<a href="${env.BUILD_URL}">${env.JOB_NAME} [${env.BUILD_NUMBER}]</a>"</p>""",
+              )
+
+          }
+
+          finally{
+              stage('Tag')
+              {
+                sh("git tag -a AspBuild#${env.BUILD_NUMBER}-${currentBuild.result} -m 'Jenkins'")
+                sh 'git config credential.helper "/bin/bash ' + env.WORKSPACE + '/odsoft/Assignment2/Component2/credential-helper.sh"'
+                withCredentials([[
+        	          $class: 'UsernamePasswordMultiBinding',
+        						credentialsId: '3b6adc3a-09d5-4d09-b122-005475566af0',
+        						usernameVariable: 'GIT_USERNAME',
+        						passwordVariable: 'GIT_PASSWORD'
+        	      ]]){
+                    sh('git push https://bitbucket.org/KonstantinShuxtelinsky/teamerasmus/src/master/ --tags')
+                }
+                sh 'git config --local --unset credential.helper'
+              }
+          } // finally
+      } // dir
+   } // node

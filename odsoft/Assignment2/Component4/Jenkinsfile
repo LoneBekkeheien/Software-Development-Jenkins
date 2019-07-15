@@ -1,0 +1,273 @@
+#!/usr/bin/env groovy
+
+node{
+
+	def tasks1 = [:]
+	def tasks2 = [:]
+	
+    // Checkout the Git repository
+	stage('Checkout') {
+	    // some block
+	    checkout([$class: 'GitSCM', branches: [[name: '*/Component4'], [name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[url: 'https://bitbucket.org/KonstantinShuxtelinsky/teamerasmus/src/']]])
+	}
+	
+	dir('odsoft/Assignment2/Component4/cms') 
+	{
+	
+		if(isUnix()){
+			try
+			{
+				// Build the project in order to get the war file 
+				stage('Build Project') {
+				    // output the actual execution
+				    sh './gradlew build'
+				    sh './gradlew war'
+				    sh './gradlew javadoc'
+			    
+				}
+				
+				
+				tasks1["task_1"] = {
+					stage('Archive Files') {
+					    // Archive the war file
+					    archiveArtifacts 'build/libs/cms-1.0.war'
+					    
+					    
+					    // publish the javadoc
+					    //publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'build/docs/javadoc', reportFiles: 'index.html', reportName: 'HTML Report', reportTitles: ''])
+					   step ([$class: 'JavadocArchiver', javadocDir: 'build/docs/javadoc', keepAll: false]) 
+					}
+				}
+				
+				tasks1["task_2"] = {
+					stage('Unit Tests'){
+				         sh './gradlew cleanTest test'
+				         
+				         publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'build/reports/test', reportFiles: 'index.html', reportName: 'HTML Report - Unit Test', reportTitles: ''])
+				         
+				         junit allowEmptyResults: true, testResults: 'build/test-results/test/*.xml'
+						  
+				    } 
+				}
+				tasks1["task_3"] = {
+					stage('Coverage report'){
+					
+						  jacoco()
+					}
+				}
+				tasks1["task_4"] = {
+				    stage('Integration Tests'){
+				        sh './gradlew cleanIntegrationTest integrationTest'
+						
+						publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'build/reports/integrationTest', reportFiles: 'index.html', reportName: 'HTML Report - Integration Test', reportTitles: ''])
+						
+				    }
+				}
+	
+				tasks1["task_5"] = {
+				
+					stage('Copy war file to tomcat'){
+			            
+			            sh ('cp build/libs/*.war /usr/local/Cellar/tomcat/9.0.12/libexec/webapps')
+			            
+			            sh ('curl --user konstantin:Kostja1 http://127.0.0.1:7071')					
+			        }
+			        
+			        
+			        
+		        }
+		        parallel tasks1
+		        
+		        stage('Mutation Tets'){
+						// some coment
+						sh './gradlew pitest'
+						
+						publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'build/reports/pitest', reportFiles: 'index.html', reportName: 'HTML Report - Mutation Test', reportTitles: ''])
+						
+				}
+		        
+		        currentBuild.result = "SUCCESS"
+			}
+			catch(err)
+			{
+				
+				currentBuild.result = "FAILURE"
+				
+				throw err
+			}
+			finally
+			{
+				tasks2["task_1"] = {
+				    stage ('Email'){
+				    	
+				    	// send to email		        
+				        emailext (body: """<p>Please proceed to Jenkins in order to perform a Manual Test or to see the Errors. Jenkins will wait for the user manual confirmation if there are no Errors.</p> <p>Check console output at "<a href="${env.BUILD_URL}">${env.JOB_NAME} [${env.BUILD_NUMBER}]</a>"</p>""", 
+				        subject: "Build was a " + currentBuild.result + " : " + currentBuild.fullDisplayName,
+				        to: 'shuxtelinsky@gmx.de')
+				    	
+				    }
+				}
+				
+				tasks2["task_2"] = {
+				    stage('Tag'){
+			    		sh("git tag -a Build#${env.BUILD_NUMBER}-${currentBuild.result} -m 'Jenkins'")
+					    sh 'git config credential.helper "/bin/bash ' + env.WORKSPACE + '/odsoft/Assignment2/credential-helper.sh"'
+					    
+					    // credentialsId here is the credentials you have set up in Jenkins for pushing
+						// to that repository using username and password.
+						withCredentials([[
+		            		$class: 'UsernamePasswordMultiBinding',
+							credentialsId: '0225aa0f-6f04-47a5-be68-614f2cc3796f',
+							usernameVariable: 'GIT_USERNAME',
+							passwordVariable: 'GIT_PASSWORD'
+		        		]]) {
+		    				
+		    				sh('git push origin --tags')
+						}
+			    	
+				    }
+			    }
+			    
+			    parallel tasks2
+			    
+			    stage ('Message'){
+			    	if ("${currentBuild.result}" == "SUCCESS")
+			    	{
+				    	input message: "Please perform a Manual Test and confirm the Action by Clicking the Button below ", ok: 'Confirm'
+				    	
+				    }   
+				}
+					    
+			}// finally
+			
+		}else{ // isUnix
+			try
+			{
+				// Build the project in order to get the war file 
+				stage('Build Project') {
+				    // output the actual execution
+				    bat 'gradlew build'
+				    bat 'gradlew war'
+				    bat 'gradlew javadoc'
+			    
+				}
+				
+				
+				tasks1["task_1"] = {
+					stage('Archive Files') {
+					    // Archive the war file
+					    archiveArtifacts 'build/libs/cms-1.0.war'
+					    
+					    // publish the javadoc
+					    publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'build/docs/javadoc', reportFiles: 'index.html', reportName: 'HTML Report', reportTitles: ''])
+					    
+					}
+				}
+				
+				tasks1["task_2"] = {
+					stage('Unit Tests'){
+				         bat 'gradlew cleanTest test'
+				         
+				         publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'build/reports/test', reportFiles: 'index.html', reportName: 'HTML Report - Unit Test', reportTitles: ''])
+				         
+				         junit allowEmptyResults: true, testResults: 'build/test-results/test/*.xml'
+						  
+				    } 
+				}
+				tasks1["task_3"] = {
+					stage('Coverage report'){
+					
+						  jacoco()
+					}
+				}
+				tasks1["task_4"] = {
+				    stage('Integration Tests'){
+				        bat 'gradlew cleanIntegrationTest integrationTest'
+						
+						publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'build/reports/integrationTest', reportFiles: 'index.html', reportName: 'HTML Report - Integration Test', reportTitles: ''])
+						
+				    }
+				}
+	
+				tasks1["task_5"] = {
+				
+					stage('Copy war file to tomcat'){
+			            
+			            bat ('cp build/libs/*.war /usr/local/Cellar/tomcat/9.0.12/libexec/webapps')
+			            
+			            bat ('curl --user konstantin:Kostja1 http://127.0.0.1:7071')					
+			        }
+			        
+			        
+			        
+		        }
+		        parallel tasks1
+		        
+		        stage('Mutation Tets'){
+						// some coment
+						bat 'gradlew pitest'
+						
+						publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'build/reports/pitest', reportFiles: 'index.html', reportName: 'HTML Report - Mutation Test', reportTitles: ''])
+						
+				}
+		        
+		        currentBuild.result = "SUCCESS"
+			}
+			catch(err)
+			{
+				
+				currentBuild.result = "FAILURE"
+				
+				throw err
+			}
+			finally
+			{
+				tasks2["task_1"] = {
+				    stage ('Email'){
+				    	
+				    	// send to email		        
+				        emailext (body: """<p>Please proceed to Jenkins in order to perform a Manual Test or to see the Errors. Jenkins will wait for the user manual confirmation if there are no Errors.</p> <p>Check console output at "<a href="${env.BUILD_URL}">${env.JOB_NAME} [${env.BUILD_NUMBER}]</a>"</p>""", 
+				        subject: "Build was a " + currentBuild.result + " : " + currentBuild.fullDisplayName,
+				        to: 'shuxtelinsky@gmx.de')
+				    	
+				    }
+				}
+				
+				tasks2["task_2"] = {
+				    stage('Tag'){
+			    		bat("git tag -a Build#${env.BUILD_NUMBER}-${currentBuild.result} -m 'Jenkins'")
+					    bat 'git config credential.helper "/bin/bash ' + env.WORKSPACE + '/odsoft/Assignment2/credential-helper.sh"'
+					    
+					    // credentialsId here is the credentials you have set up in Jenkins for pushing
+						// to that repository using username and password.
+						withCredentials([[
+		            		$class: 'UsernamePasswordMultiBinding',
+							credentialsId: '0225aa0f-6f04-47a5-be68-614f2cc3796f',
+							usernameVariable: 'GIT_USERNAME',
+							passwordVariable: 'GIT_PASSWORD'
+		        		]]) {
+		    				
+		    				bat('git push origin --tags')
+						}
+			    	
+				    }
+			    }
+			    
+			    parallel tasks2
+			    
+			    stage ('Message'){
+			    	if ("${currentBuild.result}" == "SUCCESS")
+			    	{
+				    	input message: "Please perform a Manual Test and confirm the Action by Clicking the Button below ", ok: 'Confirm'
+				    	
+				    }   
+				}
+					    
+			}// finally
+		
+		}// isUnix
+	
+	}// dir
+           
+}// node
+	

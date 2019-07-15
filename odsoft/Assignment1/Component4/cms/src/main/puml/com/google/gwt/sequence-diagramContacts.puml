@@ -1,0 +1,35 @@
+@startuml class-diagram.png
+skinparam handwritten true
+skinparam monochrome true
+skinparam packageStyle rect
+skinparam defaultFontName FG Virgil
+skinparam shadowing false
+
+actor User
+participant ContactsController
+participant ContactsDialog
+participant ContactsService
+participant EditContactPresenter
+
+
+User -> ContactsController: Edit contact
+activate ContactsController
+ContactsController ->> ContactsDialog: new
+activate ContactsDialog
+ContactsController ->> EditContactPresenter: new
+activate EditContactPresenter
+EditContactPresenter ->> EditContactPresenter: bind()
+activate EditContactPresenter
+deactivate EditContactPresenter
+EditContactPresenter ->> ContactsService: Get Contact
+activate ContactsService
+EditContactPresenter -> User: display Contact
+User -> EditContactPresenter: Save
+EditContactPresenter ->> ContactsService: Update Contact
+deactivate ContactsService
+deactivate EditContactPresenter
+deactivate ContactsDialog
+deactivate ContactsController
+
+
+@enduml
