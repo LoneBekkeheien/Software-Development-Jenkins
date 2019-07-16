@@ -6,7 +6,7 @@ The goal of this repository is to serve as a template for the exercises and proj
 
 ## 1. Structure of Folders
 
-### 1.1 Project LOOOl
+### 1.1 Project
 You should use this folder for the development of class assignments and the project.
 The project will use a Web Application developed with GWT. Later on, teachers will provide an initial version of this application (in the form of an Eclipse project) that you should copy into this folder.
 
